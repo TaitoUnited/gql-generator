@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+/* eslint-disable no-shadow */
+/* eslint-disable no-useless-escape */
+/* eslint-disable prefer-destructuring */
+/* eslint-disable no-use-before-define */
 const fs = require('fs');
 const path = require('path');
 const program = require('commander');
@@ -10,7 +14,8 @@ program
   .option('--destDirPath [value]', 'dir you want to store the generated queries')
   .parse(process.argv);
 
-const { schemaFilePath, destDirPath } = program;
+const schemaFilePath = program.schemaFilePath;
+const destDirPath = program.destDirPath;
 
 console.log('[gqlg]:', `Going to create 3 folders to store the queries inside path: ${destDirPath}`);
 const typeDef = fs.readFileSync(schemaFilePath);
@@ -28,30 +33,62 @@ const addQueryDepthLimit = 100;
  * @param name
  */
 function cleanName(name) {
-  return name.replace(/[[\]!]/g, '');
+  return name.replace(/[\[\]!]/g, '');
 }
 
 
 /**
  * Generate the query for the specified field
- * @param curName name of the current field
- * @param curParentType parent type of the current field
+ * @param name name of the current field
+ * @param parentType parent type of the current field
  * @param parentFields preceding parent field and type combinations
  */
-function generateQuery(curName, curParentType) {
+function generateQuery(name, parentType) {
   let query = '';
   const hasArgs = false;
   const argTypes = []; // [{name: 'id', type: 'Int!'}]
 
+  const fieldData = generateFieldData(name, parentType, [], 1);
+
+  const argStr = argTypes
+    .map(argType => `${argType.name}: ${argType.type}`)
+    .join(', ');
+
+  // Add the root type of the query
+  switch (parentType) {
+    case gqlSchema.getQueryType() && gqlSchema.getQueryType().name:
+      query += `query ${name}(${argStr}) `;
+      break;
+    case gqlSchema.getMutationType() && gqlSchema.getMutationType().name:
+      query += `mutation ${name}(${argStr}) `;
+      break;
+    case gqlSchema.getSubscriptionType()
+      && gqlSchema.getSubscriptionType().name:
+      query += `subscription ${name}(${argStr}) `;
+      break;
+    default:
+      throw new Error('parentType is not one of mutation/query/subscription');
+  }
+
+  // Add the query fields
+  query += `{\n${fieldData.query}\n}`;
+
+  const meta = { ...fieldData.meta };
+
+  // Update hasArgs option
+  meta.hasArgs = hasArgs || meta.hasArgs;
+
+  return { query, meta };
+
   /**
-   * Generate the query for the specified field
-   * @param name name of the current field
-   * @param parentType parent type of the current field
-   * @param parentFields preceding parent field and type combinations
-   * @param level current depth level of the current field
-   */
+     * Generate the query for the specified field
+     * @param name name of the current field
+     * @param parentType parent type of the current field
+     * @param parentFields preceding parent field and type combinations
+     * @param level current depth level of the current field
+     */
   function generateFieldData(name, parentType, parentFields, level) {
-  // console.log('Generating query for ', name, parentType);
+    // console.log('Generating query for ', name, parentType);
 
     const tabSize = 4;
     const field = gqlSchema.getType(parentType).getFields()[name];
@@ -102,8 +139,8 @@ function generateQuery(curName, curParentType) {
     if (innerFields) {
       innerFieldsData = Object.keys(innerFields)
         .reduce((acc, cur) => {
-        // Don't add a field if it has been added in the query already.
-        // This happens when there is a recursive field
+          // Don't add a field if it has been added in the query already.
+          // This happens when there is a recursive field
           if (
             parentFields.filter(x => x.name === cur && x.type === curTypeName)
               .length
@@ -142,38 +179,6 @@ function generateQuery(curName, curParentType) {
 
     return { query: fieldStr, meta };
   }
-
-  const fieldData = generateFieldData(curName, curParentType, [], 1);
-
-  const argStr = argTypes
-    .map(argType => `${argType.name}: ${argType.type}`)
-    .join(', ');
-
-  // Add the root type of the query
-  switch (curParentType) {
-    case gqlSchema.getQueryType() && gqlSchema.getQueryType().name:
-      query += `query ${curName}${argStr ? `(${argStr})` : ''}`;
-      break;
-    case gqlSchema.getMutationType() && gqlSchema.getMutationType().name:
-      query += `mutation ${curName}${argStr ? `(${argStr})` : ''}`;
-      break;
-    case gqlSchema.getSubscriptionType()
-      && gqlSchema.getSubscriptionType().name:
-      query += `subscription ${curName}${argStr ? `(${argStr})` : ''}`;
-      break;
-    default:
-      throw new Error('parentType is not one of mutation/query/subscription');
-  }
-
-  // Add the query fields
-  query += `{\n${fieldData.query}\n}`;
-
-  const meta = { ...fieldData.meta };
-
-  // Update hasArgs option
-  meta.hasArgs = hasArgs || meta.hasArgs;
-
-  return { query, meta };
 }
 
 const mutationsFolder = path.join(destDirPath, './mutations');
@@ -203,7 +208,8 @@ if (gqlSchema.getMutationType()) {
     mutationsIndexJs += `module.exports.${mutationType} = fs.readFileSync(path.join(__dirname, '${mutationType}.gql'), 'utf8');\n`;
   });
   fs.writeFileSync(path.join(mutationsFolder, 'index.js'), mutationsIndexJs);
-  indexJsExportAll += 'module.exports.mutations = require(\'./mutations\');\n';
+  indexJsExportAll += `module.exports.mutations = require('./mutations');
+`;
 } else {
   console.log('[gqlg warning]:', 'No mutation type found in your schema');
 }
@@ -216,7 +222,7 @@ if (gqlSchema.getQueryType()) {
     queriesIndexJs += `module.exports.${queryType} = fs.readFileSync(path.join(__dirname, '${queryType}.gql'), 'utf8');\n`;
   });
   fs.writeFileSync(path.join(queriesFolder, 'index.js'), queriesIndexJs);
-  indexJsExportAll += 'module.exports.queries = require(\'./queries\');\n';
+  indexJsExportAll += 'module.exports.queries = require(\'./queries\');';
 } else {
   console.log('[gqlg warning]:', 'No query type found in your schema');
 }
@@ -229,7 +235,7 @@ if (gqlSchema.getSubscriptionType()) {
     subscriptionsIndexJs += `module.exports.${subscriptionType} = fs.readFileSync(path.join(__dirname, '${subscriptionType}.gql'), 'utf8');\n`;
   });
   fs.writeFileSync(path.join(subscriptionsFolder, 'index.js'), subscriptionsIndexJs);
-  indexJsExportAll += 'module.exports.subscriptions = require(\'./subscriptions\');\n';
+  indexJsExportAll += 'module.exports.subscriptions = require(\'./subscriptions\');';
 } else {
   console.log('[gqlg warning]:', 'No subscription type found in your schema');
 }
