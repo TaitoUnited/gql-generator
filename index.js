@@ -15,6 +15,7 @@ program
     '--destDirPath [value]',
     'dir you want to store the generated queries',
   )
+  .option('--depthLimit [value]', 'limit the max depth of the generated query')
   .parse(process.argv);
 
 const schemaFilePath = program.schemaFilePath;
@@ -30,7 +31,7 @@ const source = new Source(typeDef);
 // const ast = parse(source);
 const gqlSchema = buildSchema(source);
 
-const addQueryDepthLimit = 100;
+const addQueryDepthLimit = program.depthLimit || 100;
 // schema.getType
 
 /**
@@ -99,6 +100,7 @@ function generateQuery(name, parentType) {
 
     const meta = {
       hasArgs: false,
+      hasChildren: false,
     };
 
     // Start the query with the field name
@@ -111,11 +113,6 @@ function generateQuery(name, parentType) {
     // Don't add a field if it has been added in the query already.
     // This happens when there is a recursive field
     if (parentFields.filter(x => x.type === curTypeName).length) {
-      return { query: '', meta: {} };
-    }
-
-    // Stop adding new fields once the specified level depth limit is reached
-    if (level >= addQueryDepthLimit) {
       return { query: '', meta: {} };
     }
 
@@ -141,6 +138,7 @@ function generateQuery(name, parentType) {
     const innerFields = curType.getFields && curType.getFields();
     let innerFieldsData = null;
     if (innerFields) {
+      meta.hasChildren = true;
       innerFieldsData = Object.keys(innerFields)
         .reduce((acc, cur) => {
           // Don't add a field if it has been added in the query already.
@@ -159,9 +157,12 @@ function generateQuery(name, parentType) {
             level + 1,
           );
           const curInnerFieldStr = curInnerFieldData.query;
-
           // Set the hasArgs meta if the inner field has args
           meta.hasArgs = meta.hasArgs || curInnerFieldData.meta.hasArgs;
+
+          if (curInnerFieldData.meta.hasChildren && level + 1 >= addQueryDepthLimit) {
+            return acc;
+          }
 
           // Don't bother adding the field if there was nothing generated.
           // This should fix the empty line issue in the inserted queries
