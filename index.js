@@ -150,6 +150,19 @@ function generateQuery(name, parentType) {
             return '';
           }
 
+          const innerField = innerFields[cur];
+
+          const innerTypeName = cleanName(innerField.type.inspect());
+          const innerType = gqlSchema.getType(innerTypeName);
+          const subFields = innerType.getFields && innerType.getFields();
+          const hasChildren = Object.keys(subFields || {}).length > 0;
+
+          console.log(cur, subFields);
+
+          if (hasChildren && level + 1 >= addQueryDepthLimit) {
+            return acc;
+          }
+
           const curInnerFieldData = generateFieldData(
             cur,
             curTypeName,
@@ -159,10 +172,6 @@ function generateQuery(name, parentType) {
           const curInnerFieldStr = curInnerFieldData.query;
           // Set the hasArgs meta if the inner field has args
           meta.hasArgs = meta.hasArgs || curInnerFieldData.meta.hasArgs;
-
-          if (curInnerFieldData.meta.hasChildren && level + 1 >= addQueryDepthLimit) {
-            return acc;
-          }
 
           // Don't bother adding the field if there was nothing generated.
           // This should fix the empty line issue in the inserted queries
