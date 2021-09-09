@@ -157,8 +157,6 @@ function generateQuery(name, parentType) {
           const subFields = innerType.getFields && innerType.getFields();
           const hasChildren = Object.keys(subFields || {}).length > 0;
 
-          console.log(cur, subFields);
-
           if (hasChildren && level + 1 >= addQueryDepthLimit) {
             return acc;
           }
