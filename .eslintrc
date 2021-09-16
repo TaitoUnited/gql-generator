@@ -1,11 +1,13 @@
 {
-    "extends": ["airbnb-base"],
+    "extends": ["airbnb-base", "prettier"],
     "rules": {
       "no-console": "off",
-      "global-require": "off"
+      "global-require": "off",
+      "prettier/prettier": "error"
     },
     "env": {
       "mocha": true
-    }
+    },
+    "plugins": ["prettier"]
 }
   
