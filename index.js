@@ -36,6 +36,10 @@ function cleanName(name) {
   return name.replace(/[\[\]!]/g, '');
 }
 
+function camelCase(parts) {
+  return parts.reduce((str, cur) => `${str}${cur.slice(0, 1).toLocaleUpperCase()}${cur.slice(1).toLocaleLowerCase()}`);
+}
+
 /**
  * Generate the query for the specified field
  * @param name name of the current field
@@ -111,10 +115,22 @@ function generateQuery(name, parentType) {
     if (field.args && field.args.length) {
       meta.hasArgs = true;
 
+      const variableExists = (name) => argTypes.some((existing) => existing.name === `$${name}`);
+
       const args = field.args.map((arg) => {
-        const varName = argTypes.some((existing) => existing.name === `$${arg.name}`)
-          ? `${field.name}${arg.name.slice(0, 1).toLocaleUpperCase()}${arg.name.slice(1)}`
+        let varName = variableExists(arg.name)
+          ? camelCase(parentFields.map((field) => field.name).concat(arg.name))
           : arg.name;
+
+        if (variableExists(varName)) {
+          const [number] = varName.match(/([0-9]+)$/) || [];
+          if (!number) {
+            varName = `${varName}1`;
+          } else {
+            varName = `${varName}${Number(number) + 1}`;
+          }
+        }
+
         return {
           type: arg.type,
           name: arg.name,
