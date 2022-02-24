@@ -53,18 +53,19 @@ function generateQuery(name, parentType) {
 
   const fieldData = generateFieldData(name, parentType, [], 1);
 
-  const argStr = argTypes.map((argType) => `${argType.name}: ${argType.type}`).join(', ');
+  const argStr =
+    argTypes.length > 0 ? `(${argTypes.map((argType) => `${argType.name}: ${argType.type}`).join(', ')})` : '';
 
   // Add the root type of the query
   switch (parentType) {
     case gqlSchema.getQueryType() && gqlSchema.getQueryType().name:
-      query += `query ${name}(${argStr}) `;
+      query += `query ${name}${argStr} `;
       break;
     case gqlSchema.getMutationType() && gqlSchema.getMutationType().name:
-      query += `mutation ${name}(${argStr}) `;
+      query += `mutation ${name}${argStr} `;
       break;
     case gqlSchema.getSubscriptionType() && gqlSchema.getSubscriptionType().name:
-      query += `subscription ${name}(${argStr}) `;
+      query += `subscription ${name}${argStr} `;
       break;
     default:
       throw new Error('parentType is not one of mutation/query/subscription');
