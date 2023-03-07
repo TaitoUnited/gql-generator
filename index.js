@@ -19,7 +19,7 @@ const schemaFilePath = program.schemaFilePath;
 const destDirPath = program.destDirPath;
 
 console.log('[gqlg]:', `Going to create 3 folders to store the queries inside path: ${destDirPath}`);
-const typeDef = fs.readFileSync(schemaFilePath);
+const typeDef = fs.readFileSync(schemaFilePath, 'utf8');
 
 const source = new Source(typeDef);
 // const ast = parse(source);
@@ -34,6 +34,14 @@ const addQueryDepthLimit = program.depthLimit || 100;
  */
 function cleanName(name) {
   return name.replace(/[\[\]!]/g, '');
+}
+
+function getName(type) {
+  if ('ofType' in type) {
+    return getName(type.ofType);
+  }
+
+  return type.name;
 }
 
 function camelCase(parts) {
@@ -103,7 +111,7 @@ function generateQuery(name, parentType) {
     let fieldStr = ' '.repeat(level * tabSize) + field.name;
 
     // Retrieve the current field type
-    const curTypeName = cleanName(field.type.inspect());
+    const curTypeName = cleanName(getName(field.type));
     const curType = gqlSchema.getType(curTypeName);
 
     // Don't add a field if it has been added in the query already.
@@ -166,7 +174,7 @@ function generateQuery(name, parentType) {
 
           const innerField = innerFields[cur];
 
-          const innerTypeName = cleanName(innerField.type.inspect());
+          const innerTypeName = cleanName(getName(innerField.type));
           const innerType = gqlSchema.getType(innerTypeName);
           const subFields = innerType.getFields && innerType.getFields();
           const hasChildren = Object.keys(subFields || {}).length > 0;
