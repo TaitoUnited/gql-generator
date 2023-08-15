@@ -128,7 +128,10 @@ function generateQuery(name, parentType) {
 
       const args = field.args.map((arg) => {
         let varName = variableExists(arg.name)
-          ? camelCase(parentFields.map((field) => field.name).concat(arg.name))
+          ? camelCase(parentFields.map((field) => field.name)
+            .concat(name)
+            .concat(arg.name)
+          )
           : arg.name;
 
         if (variableExists(varName)) {
